@@ -7,83 +7,62 @@
 
 ## 📚 项目简介
 
-mini-zero 是我学习 go-zero 框架的实践项目，目标是：
+mini-zero 是一个学习型项目，旨在通过实现 go-zero 框架的核心组件来深入理解微服务框架的设计思想。项目采用渐进式开发，每个模块都经过仔细的设计和测试。
 
+**学习目标：**
 - 🔍 深入理解 go-zero 的核心设计理念
 - 💡 掌握 Go 微服务开发的最佳实践
 - 🛠️ 从零实现框架核心组件
-- 📝 记录学习过程和技术心得
+- 📝 积累生产级代码编写经验
 
-## 🎯 学习计划
+> 📖 详细的学习计划和日志请查看 [LEARNING.md](LEARNING.md)
 
-### 第一阶段：基础组件（进行中）
+## ✨ 已实现功能
 
-- [x] **日志系统 (logx)**
-  - [x] Logger 接口设计
-  - [x] 配置管理
-  - [x] 延迟求值优化
-  - [ ] 多种 Writer 实现
-  - [ ] 日志级别控制
-  - [ ] 结构化日志
+### 日志系统 (logx)
 
-- [ ] **并发控制 (syncx)**
-  - [x] AtomicBool 实现
-  - [ ] 限流器 (Rate Limiter)
-  - [ ] 熔断器 (Circuit Breaker)
-  - [ ] 线程池
+提供高性能、易用的日志功能，支持延迟求值优化。
 
-### 第二阶段：网络通信
+**核心特性：**
+- ✅ Logger 接口设计
+- ✅ 灵活的配置管理
+- ✅ 延迟求值 (Debugfn) - 避免不必要的性能开销
+- ✅ 多种日志级别 (Debug, Info, Warning, Error)
 
-- [ ] **HTTP 服务器**
-  - [ ] 路由设计
-  - [ ] 中间件机制
-  - [ ] 请求响应处理
+### 并发控制 (syncx)
 
-- [ ] **RPC 框架**
-  - [ ] 服务注册与发现
-  - [ ] 负载均衡
-  - [ ] 超时控制
+提供高性能的并发原语和工具。
 
-### 第三阶段：高级特性
-
-- [ ] **缓存系统**
-- [ ] **数据库集成**
-- [ ] **链路追踪**
-- [ ] **服务监控**
-
-## 📖 学习日志
-
-### 2025-11-16
-- ✅ 初始化项目，创建 git 仓库
-- ✅ 完成 Logger 接口设计
-- ✅ 实现延迟求值的 `Debugfn` 方法，添加使用示例
-- ✅ 学习要点：
-  - 延迟求值可以避免不必要的性能开销
-  - 通过 `func() any` 实现懒加载式日志记录
-
-### 2025-11-15
-- ✅ 学习 go-zero 日志系统源码
-- ✅ 设计 logx 模块架构
-- ✅ 实现 AtomicBool 原子操作
+**核心特性：**
+- ✅ AtomicBool - 原子布尔操作
 
 ## 🏗️ 项目结构
 
 ```
 mini-zero/
 ├── core/
-│   ├── logx/          # 日志系统
-│   │   ├── config.go      # 配置定义
-│   │   ├── logger.go      # Logger 接口
-│   │   ├── writer.go      # 日志写入器
-│   │   └── ...
-│   └── syncx/         # 并发控制
-│       ├── atomicbool.go  # 原子布尔值
-│       └── ...
+│   ├── logx/              # 日志系统
+│   │   ├── config.go          # 配置定义
+│   │   ├── fields.go          # 日志字段
+│   │   ├── logger.go          # Logger 接口
+│   │   ├── logs.go            # 日志实现
+│   │   ├── logwriter.go       # 日志写入器
+│   │   ├── vars.go            # 全局变量
+│   │   ├── writer.go          # Writer 接口
+│   │   └── *_test.go          # 单元测试
+│   └── syncx/             # 并发控制
+│       ├── atomicbool.go      # 原子布尔值
+│       └── atomicbool_test.go # 单元测试
 ├── go.mod
-└── README.md
+├── README.md              # 项目说明
+└── LEARNING.md            # 学习计划与日志
 ```
 
 ## 🚀 快速开始
+
+### 前置要求
+
+- Go 1.20 或更高版本
 
 ### 安装依赖
 
@@ -94,10 +73,20 @@ go mod download
 ### 运行测试
 
 ```bash
+# 运行所有测试
 go test ./...
+
+# 运行特定模块测试
+go test ./core/logx
+go test ./core/syncx
+
+# 查看测试覆盖率
+go test -cover ./...
 ```
 
 ### 使用示例
+
+#### 日志系统
 
 ```go
 package main
@@ -105,19 +94,42 @@ package main
 import "github.com/YunFy26/mini-zero/core/logx"
 
 func main() {
-    logger := logx.NewLogger()
-    
     // 普通日志
-    logger.Debug("simple debug message")
+    logx.Debug("simple debug message")
+    logx.Info("application started")
     
     // 格式化日志
-    logger.Debugf("user: %s, id: %d", "Alice", 123)
+    logx.Debugf("user: %s, id: %d", "Alice", 123)
     
-    // 延迟求值（只在 Debug 级别启用时才执行）
-    logger.Debugfn(func() any {
-        // 昂贵的计算只在需要时执行
-        return computeExpensiveData()
+    // 延迟求值（推荐用于昂贵操作）
+    logx.Debugfn(func() any {
+        // 只在 Debug 级别启用时才执行
+        return fmt.Sprintf("data: %v", computeExpensiveData())
     })
+}
+```
+
+#### 原子操作
+
+```go
+package main
+
+import "github.com/YunFy26/mini-zero/core/syncx"
+
+func main() {
+    // 创建原子布尔值
+    flag := syncx.NewAtomicBool()
+    
+    // 设置值
+    flag.Set(true)
+    
+    // 获取值
+    if flag.True() {
+        // do something
+    }
+    
+    // 比较并交换
+    flag.CompareAndSwap(true, false)
 }
 ```
 
@@ -125,22 +137,7 @@ func main() {
 
 - [go-zero 官方文档](https://go-zero.dev/)
 - [go-zero GitHub](https://github.com/zeromicro/go-zero)
-- [Go 语言官方文档](https://go.dev/doc/)
-- [Effective Go](https://go.dev/doc/effective_go)
-
-## 💡 核心知识点
-
-### 日志系统设计
-
-- **延迟求值**：通过闭包实现懒加载，避免不必要的性能开销
-- **结构化日志**：便于日志分析和查询
-- **日志级别**：Debug, Info, Warning, Error, Fatal
-
-### 并发编程
-
-- **原子操作**：无锁的线程安全操作
-- **并发原语**：Mutex, RWMutex, WaitGroup
-- **channel 模式**：生产者-消费者、扇入扇出
+- [学习计划与日志](LEARNING.md)
 
 ## 🤝 贡献
 
@@ -157,4 +154,4 @@ MIT License
 
 ---
 
-**学习笔记**：每天坚持学习一点，记录成长的每一步 🚀
+⭐ 如果这个项目对你有帮助，欢迎 Star！
