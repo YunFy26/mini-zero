@@ -1,0 +1,39 @@
+# Binaries for programs and plugins
+/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, coverage
+*.test
+coverage.out
+
+# Vendor
+/vendor/
+
+# Go workspace files
+*.exe
+*.test
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Go build cache
+**/pkg/mod/
+**/pkg/sumdb/
+
+# Mac specific
+*.DS_Store
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+
+# Environment files
+.env
