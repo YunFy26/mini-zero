@@ -1,6 +1,10 @@
 package logx
 
-import "sync"
+import (
+	"fmt"
+	"reflect"
+	"sync"
+)
 
 const callerDepth = 5
 
@@ -42,4 +46,34 @@ func Field(key string, value any) LogField {
 		Key:   key,
 		Value: value,
 	}
+}
+
+// err -> string
+func encodeError(err error) (ret string) {
+	return encodeWithRecover(err, func() string {
+		// 可能会NPE
+		return err.Error()
+	})
+}
+
+// stringer -> string
+func encodeStringer(s fmt.Stringer) string {
+	return encodeWithRecover(s, func() string {
+		// 可能会NPE
+		return s.String()
+	})
+}
+
+// recover() panic
+func encodeWithRecover(arg any, fn func() string) (ret string) {
+	defer func() {
+		if err := recover(); err != nil {
+			if v := reflect.ValueOf(arg); v.Kind() == reflect.Ptr && v.IsNil() {
+				ret = nilAngleString
+			} else {
+				ret = fmt.Sprintf("panic: %v", err)
+			}
+		}
+	}()
+	return fn()
 }

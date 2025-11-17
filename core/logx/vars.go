@@ -15,7 +15,7 @@ const (
 	disableLevel = 0xff        // 255: 禁用所有日志
 )
 
-// 编码类型常量
+// 日志编码格式：json 或 纯文本
 const (
 	jsonEncodingType  = iota // 0: JSON 编码
 	plainEncodingType        // 1: 纯文本编码
