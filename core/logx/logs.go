@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"sync/atomic"
 )
 
 const callerDepth = 5
@@ -40,6 +41,30 @@ type (
 		rotationRule          string
 	}
 )
+
+// 添加日志写入器，支持多个写入器同时写入
+func AddWriter(w Writer) {
+	ow := Reset()
+	if ow == nil {
+		SetWriter(w)
+	} else {
+		SetWriter(comboWriter{
+			writers: []Writer{ow, w},
+		})
+	}
+}
+
+// 重置当前日志写入器，返回旧的写入器
+func Reset() Writer {
+	return writer.Swap(nil)
+}
+
+// 设置日志写入器
+func SetWriter(w Writer) {
+	if atomic.LoadUint32(&logLevel) != disableLevel {
+		writer.Store(w)
+	}
+}
 
 func Field(key string, value any) LogField {
 	return LogField{

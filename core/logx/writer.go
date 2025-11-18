@@ -10,6 +10,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/YunFy26/mini-zero/core/color"
+	"github.com/YunFy26/mini-zero/core/errorx"
 )
 
 type (
@@ -32,7 +35,7 @@ type (
 	}
 	// 组合写入
 	comboWriter struct {
-		writer []Writer
+		writers []Writer
 	}
 	// 具体的日志写入器实现
 	concreteWriter struct {
@@ -59,6 +62,105 @@ func NewWriter(w io.Writer) Writer {
 		stackLog:  lw,
 	}
 }
+
+func (w *atomicWriter) Load() Writer {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.writer
+}
+
+func (w *atomicWriter) Store(writer Writer) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	w.writer = writer
+}
+
+func (w *atomicWriter) StoreIfNil(v Writer) Writer {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	if w.writer == nil {
+		w.writer = v
+	}
+	return w.writer
+}
+
+// 切换写入器，返回旧的写入器
+func (w *atomicWriter) Swap(v Writer) Writer {
+	w.lock.Lock()
+	defer w.lock.Unlock()
+	old := w.writer
+	w.writer = v
+	return old
+}
+
+func (c comboWriter) Alert(v any) {
+	for _, w := range c.writers {
+		w.Alert(v)
+	}
+}
+
+func (c comboWriter) Close() error {
+	var be errorx.BatchError
+	for _, w := range c.writers {
+		be.Add(w.Close())
+	}
+	return be.Err()
+}
+
+func (c comboWriter) Debug(v any, fields ...LogField) {
+	for _, w := range c.writers {
+		w.Debug(v, fields...)
+	}
+}
+
+func (c comboWriter) Error(v any, fields ...LogField) {
+	for _, w := range c.writers {
+		w.Error(v, fields...)
+	}
+}
+
+func (c comboWriter) Info(v any, fields ...LogField) {
+	for _, w := range c.writers {
+		w.Info(v, fields...)
+	}
+}
+
+func (c comboWriter) Severe(v any) {
+	for _, w := range c.writers {
+		w.Severe(v)
+	}
+}
+
+func (c comboWriter) Slow(v any, fields ...LogField) {
+	for _, w := range c.writers {
+		w.Slow(v, fields...)
+	}
+}
+
+func (c comboWriter) Stack(v any) {
+	for _, w := range c.writers {
+		w.Stack(v)
+	}
+}
+
+func (c comboWriter) Stat(v any, fields ...LogField) {
+	for _, w := range c.writers {
+		w.Stat(v, fields...)
+	}
+}
+
+// func newConsoleWriter() Writer {
+// 	outLog := newLogWriter(log.New(fatihcolor.Output, "", flags))
+// 	errLog := newLogWriter(log.New(fatihcolor.Error, "", flags))
+// 	return &concreteWriter{
+// 		infoLog:   outLog,
+// 		errorLog:  errLog,
+// 		severeLog: errLog,
+// 		slowLog:   outLog,
+// 		statLog:   outLog,
+// 		stackLog:  newLessWriter(errLog, options.logStackCooldownMills),
+// 	}
+// }
 
 func (w *concreteWriter) Alert(v any) {
 	output(w.errorLog, levelAlert, v)
@@ -178,6 +280,7 @@ func processFieldValue(value any) any {
 func buildPlainFields(fields logEntry) []string {
 	items := make([]string, 0, len(fields))
 	for k, v := range fields {
+		// 格式化输出 %v 和 %+v 的区别
 		// %v:
 		// {Bob 30 {New York NY}}
 		// %+v:
@@ -203,9 +306,29 @@ func writePlainAny(writer io.Writer, level string, val any, fields ...string) {
 }
 
 func wrapLevelWithColor(level string) string {
-	// var colour
+	var colour color.Color
+	switch level {
+	case levelAlert:
+		colour = color.FgRed
+	case levelError:
+		colour = color.FgRed
+	case levelFatal:
+		colour = color.FgRed
+	case levelInfo:
+		colour = color.FgGreen
+	case levelSlow:
+		colour = color.FgYellow
+	case levelDebug:
+		colour = color.FgYellow
+	case levelStat:
+		colour = color.FgGreen
+	}
 
-	return level
+	if colour == color.NoColor {
+		return level
+	}
+
+	return color.WithColorPadding(level, colour)
 }
 
 // 写入文本日志
@@ -257,8 +380,35 @@ func writePlainValue(writer io.Writer, level string, val any, fields ...string) 
 	}
 }
 
-func writeJson(writer io.Writer, entry logEntry) {
+func writeJson(writer io.Writer, info any) {
+	if content, err := marshalJson(info); err != nil {
+		log.Printf("err: %s\n\n%s", err.Error(), debug.Stack())
+	} else if writer == nil {
+		log.Println(string(contentKey))
+	} else {
+		if _, err := writer.Write(append(content, '\n')); err != nil {
+			log.Println(err.Error())
+		}
+	}
+}
 
+// 将任意值编码为JSON格式的字节切片
+func marshalJson(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	encoder := json.NewEncoder(&buf)
+	// 禁止HTML转义
+	encoder.SetEscapeHTML(false)
+	err := encoder.Encode(v)
+	// 移除末尾的换行符
+	if l := buf.Len(); l > 0 && buf.Bytes()[l-1] == '\n' {
+		buf.Truncate(l - 1)
+	}
+	return buf.Bytes(), err
+}
+
+// TODO: 实现全局字段合并
+func mergeGloablFields(fields []LogField) []LogField {
+	return nil
 }
 
 func (n nopWriter) Alert(_ any)                {}
