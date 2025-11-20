@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/YunFy26/mini-zero/core/color"
 	"github.com/YunFy26/mini-zero/core/errorx"
+	fatihcolor "github.com/fatih/color"
 )
 
 type (
@@ -149,18 +151,94 @@ func (c comboWriter) Stat(v any, fields ...LogField) {
 	}
 }
 
-// func newConsoleWriter() Writer {
-// 	outLog := newLogWriter(log.New(fatihcolor.Output, "", flags))
-// 	errLog := newLogWriter(log.New(fatihcolor.Error, "", flags))
-// 	return &concreteWriter{
-// 		infoLog:   outLog,
-// 		errorLog:  errLog,
-// 		severeLog: errLog,
-// 		slowLog:   outLog,
-// 		statLog:   outLog,
-// 		stackLog:  newLessWriter(errLog, options.logStackCooldownMills),
-// 	}
-// }
+func newConsoleWriter() Writer {
+	outLog := newLogWriter(log.New(fatihcolor.Output, "", flags))
+	errLog := newLogWriter(log.New(fatihcolor.Error, "", flags))
+	return &concreteWriter{
+		infoLog:   outLog,
+		errorLog:  errLog,
+		severeLog: errLog,
+		slowLog:   outLog,
+		statLog:   outLog,
+		stackLog:  newLessWriter(errLog, options.logStackCooldownMills),
+	}
+}
+
+func newFileWriter(c LogConf) (Writer, error) {
+	var err error
+	var opts []LogOption
+	var infoLog io.WriteCloser
+	var errorLog io.WriteCloser
+	var severeLog io.WriteCloser
+	var slowLog io.WriteCloser
+	var statLog io.WriteCloser
+	var stackLog io.Writer
+
+	if len(c.Path) == 0 {
+		return nil, ErrLogPathNotSet
+	}
+
+	// 堆栈冷却时间
+	opts = append(opts, WithCoolDownMillis(c.StackCooldownMillis))
+	// 日志压缩
+	if c.Compress {
+		opts = append(opts, WithGzip())
+	}
+	// 日志保留天数
+	if c.KeepDays > 0 {
+		opts = append(opts, WithKeepDays(c.KeepDays))
+	}
+	// 最大备份文件数
+	if c.MaxBackups > 0 {
+		opts = append(opts, WithMaxBackups(c.MaxBackups))
+	}
+	// 单个日志文件最大尺寸
+	if c.MaxSize > 0 {
+		opts = append(opts, WithMaxSize(c.MaxSize))
+	}
+	// 日志轮转规则
+	opts = append(opts, WithRotation(c.Rotation))
+
+	accessFile := path.Join(c.Path, accessFilename)
+	errorFile := path.Join(c.Path, errorFilename)
+	severeFile := path.Join(c.Path, severeFilename)
+	slowFile := path.Join(c.Path, slowFilename)
+	statFile := path.Join(c.Path, statFilename)
+
+	handleOptions(opts)
+
+	if infoLog, err = createOutput(accessFile); err != nil {
+		return nil, err
+	}
+
+	if errorLog, err = createOutput(errorFile); err != nil {
+		return nil, err
+	}
+
+	if severeLog, err = createOutput(severeFile); err != nil {
+		return nil, err
+	}
+
+	if slowLog, err = createOutput(slowFile); err != nil {
+		return nil, err
+	}
+
+	if statLog, err = createOutput(statFile); err != nil {
+		return nil, err
+	}
+
+	stackLog = newLessWriter(errorLog, options.logStackCooldownMills)
+
+	return &concreteWriter{
+		infoLog:   infoLog,
+		errorLog:  errorLog,
+		severeLog: severeLog,
+		slowLog:   slowLog,
+		statLog:   statLog,
+		stackLog:  stackLog,
+	}, nil
+
+}
 
 func (w *concreteWriter) Alert(v any) {
 	output(w.errorLog, levelAlert, v)
