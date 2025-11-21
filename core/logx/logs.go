@@ -216,4 +216,13 @@ func createOutput(path string) (io.WriteCloser, error) {
 	}
 
 	var rule RotateRule
+	switch options.rotationRule {
+	case sizeRotationRule:
+		rule = NewSizeLimitRotateRule(path, backupFileDelimiter, options.keepDays, options.maxSize,
+			options.maxBackups, options.gzipEnabled)
+	default:
+		rule = DefaultRotateRule(path, backupFileDelimiter, options.keepDays, options.gzipEnabled)
+	}
+
+	return NewLogger(path, rule, options.gzipEnabled)
 }

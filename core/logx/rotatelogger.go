@@ -1,12 +1,27 @@
 package logx
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/YunFy26/mini-zero/core/lang"
+)
+
+const (
+	hoursPerDay     = 24
+	bufferSize      = 100
+	defaultDirMode  = 0o755
+	defaultFileMode = 0o600
+	gzipExt         = ".gz"
+	megaBytes       = 1 << 20
+)
+
+var (
+	ErrorLogFileClosed = errors.New("error: log file closed")
+	fileTimeFormat     = time.RFC3339
 )
 
 type (
@@ -49,10 +64,55 @@ type (
 	}
 )
 
+// ==================== DailyRotateRule Methods =========================
+
+// BackupFileName returns the backup file name based on the current date.
 func (r *DailyRotateRule) BackupFileName() string {
 	return fmt.Sprintf("%s%s%s", r.filename, r.delimiter, getNowDate())
 }
 
+// MarkRotated updates the rotated time to the current date.
+func (r *DailyRotateRule) MarkRotated() {
+	r.rotatedTime = getNowDate()
+}
+
+func (r *DailyRotateRule) OutdatedFiles() []string {
+	if r.days < 0 {
+		return nil
+	}
+
+	var pattern string
+	if r.gzip {
+		pattern = fmt.Sprintf("%s%s*%s", r.filename, r.delimiter, gzipExt)
+	} else {
+		pattern = fmt.Sprintf("%s%s*", r.filename, r.delimiter)
+	}
+
+}
+
+func (r *DailyRotateRule) ShallRotate(size int64) bool {
+
+}
+
 func getNowDate() string {
 	return time.Now().Format(time.DateOnly)
+}
+
+// NewSizeLimitRotateRule returns the rotation rule with size limit
+func NewSizeLimitRotateRule(filename, delimiter string, days, maxSize, maxBackups int, gzip bool) RotateRule {
+	return &SizeLimitRotateRule{
+		DailyRotateRule: DailyRotateRule{
+			rotatedTime: getNowDateInRFC3339Format(),
+			filename:    filename,
+			delimiter:   delimiter,
+			days:        days,
+			gzip:        gzip,
+		},
+		maxSize:    int64(maxSize) * megaBytes,
+		maxBackups: maxBackups,
+	}
+}
+
+func getNowDateInRFC3339Format() string {
+	return time.Now().Format(fileTimeFormat)
 }

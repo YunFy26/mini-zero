@@ -35,7 +35,8 @@ const (
 	plainEncodingSep = '\t'    // 纯文本分隔符（制表符）
 
 	// 日志轮转规则
-	sizeRotationRule = "size" // 按大小轮转
+	// 按大小轮转
+	sizeRotationRule = "size"
 
 	// 写入模式
 	fileMode   = "file"   // 文件模式
